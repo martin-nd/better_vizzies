@@ -18,7 +18,7 @@ Lately I have been working a lot on improving my technical skills, but I also ne
 
 We may as well start with the inspiration for this project, the [Scientific American "Baby Spike" visualization](https://www.visualcinnamon.com/2017/10/creating-baby-births-visual/). While reading Bremer's linked blog post, I realized that I had done a project that also contained cyclical time series information that may benefit from a visualization like this. We see the result of my attempt below.
 
-```{r, message = F}
+```{r, message = F, fig.align = "center", fig.width = 10, fig.height = 10}
 data = read_csv("data/seattle_collision_data_2005_2019.csv")
 to_mins = function(mildectime) {
   mins = as.integer(60 * mildectime)
@@ -29,11 +29,14 @@ by_mins = data %>%
         mutate(TIME = to_mins(TIME)) %>%
         group_by(TIME) %>%
         summarize(count = n()) %>%
-        mutate(total_mean = mean(count))
+        mutate(total_mean = mean(count),
+               rolling_mean = DescTools::MoveAvg(count, 5, "center"))
 
 ggplot(by_mins) +
-        geom_point(aes(x = TIME, y = count)) +
-        geom_smooth(aes(x = TIME, y = count), method = loess) +
+        geom_point(aes(x = TIME, y = rolling_mean)) +
+        geom_smooth(aes(x = TIME, y = rolling_mean),
+                    method = lm, formula = y ~ poly(x, 10), se = F,
+                    fill = "#8FE013", color = "#8FE013") +
         geom_line(aes(x = TIME, y = total_mean)) +
         coord_polar()
 
