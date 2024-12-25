@@ -1,0 +1,41 @@
+---
+title: "Improving Visualizations"
+author: "Martin Sloley"
+output:
+    bookdown::html_document2:
+        theme: united
+        toc: true
+---
+
+```{r setup, echo = F, message = F, warning = F}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+library(tidyverse)
+```
+
+Lately I have been working a lot on improving my technical skills, but I also need to be better about some of my soft skills, and in particular, my ability to communicate visually with data. In an effort to improve this ability, I am taking data from older projects and improving old visualizations, as well as adding new ones.
+
+# Traffic in Seattle
+
+We may as well start with the inspiration for this project, the [Scientific American "Baby Spike" visualization](https://www.visualcinnamon.com/2017/10/creating-baby-births-visual/). While reading Bremer's linked blog post, I realized that I had done a project that also contained cyclical time series information that may benefit from a visualization like this. We see the result of my attempt below.
+
+```{r, message = F}
+data = read_csv("data/seattle_collision_data_2005_2019.csv")
+to_mins = function(mildectime) {
+  mins = as.integer(60 * mildectime)
+  return(mins)
+}
+
+by_mins = data %>%
+        mutate(TIME = to_mins(TIME)) %>%
+        group_by(TIME) %>%
+        summarize(count = n()) %>%
+        mutate(total_mean = mean(count))
+
+ggplot(by_mins) +
+        geom_point(aes(x = TIME, y = count)) +
+        geom_smooth(aes(x = TIME, y = count), method = loess) +
+        geom_line(aes(x = TIME, y = total_mean)) +
+        coord_polar()
+
+mean(by_mins$count)
+```
