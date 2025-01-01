@@ -24,21 +24,65 @@ to_mins = function(mildectime) {
   mins = as.integer(60 * mildectime)
   return(mins)
 }
+by_mins2 = data %>%
+        mutate(TIME = to_mins(TIME)) %>%
+        group_by(DATE, TIME) %>%
+        summarize(count = n()) %>%
+        group_by(TIME) %>%
+        summarize(mean_cpm = mean(count))
 
 by_mins = data %>%
         mutate(TIME = to_mins(TIME)) %>%
         group_by(TIME) %>%
         summarize(count = n()) %>%
         mutate(total_mean = mean(count),
-               rolling_mean = DescTools::MoveAvg(count, 5, "center"))
+               rolling_mean = DescTools::MoveAvg(count, 5, "center")) %>%
+        mutate(norm_dist_from_mean = (rolling_mean - total_mean) / sd(count)) %>%
+        arrange(TIME)
 
-ggplot(by_mins) +
-        geom_point(aes(x = TIME, y = rolling_mean)) +
-        geom_smooth(aes(x = TIME, y = rolling_mean),
-                    method = lm, formula = y ~ poly(x, 10), se = F,
-                    fill = "#8FE013", color = "#8FE013") +
-        geom_line(aes(x = TIME, y = total_mean)) +
-        coord_polar()
+mod = lm(norm_dist_from_mean ~ poly(TIME, 20), by_mins)
+by_mins$fit_vals = predict(mod, by_mins)
 
-mean(by_mins$count)
+p1 = ggplot(by_mins) +
+        geom_ribbon(aes(x = TIME, y = ifelse(fit_vals >= 0, fit_vals, 0),
+                        ymax = ifelse(fit_vals >= 0, fit_vals, 0), ymin = 0),
+                    alpha = 0.6, fill = "#EF5945") +
+        geom_ribbon(aes(x = TIME, y = ifelse(fit_vals < 0, fit_vals, 0),
+                        ymin = ifelse(fit_vals < 0, fit_vals, 0), ymax = 0),
+                    alpha = 0.8, fill = "#18C3EA") +
+        geom_line(aes(x = TIME, y = rep(0, nrow(by_mins))),
+                  color = "#EFE745", size = 1.5) +
+        geom_line(aes(x = TIME, y = fit_vals), size = 0.2) +
+        geom_point(aes(x = TIME, y = norm_dist_from_mean),
+                   alpha = 0.3, shape = 1, size = 0.8) +
+        labs(x = "Vehicle Collisions\nper Minute in the Day") +
+        scale_y_continuous(limits = c(-2, 2.5)) +
+        scale_x_continuous(limits = c(-120, 1560)) +
+        geom_segment(aes(x = 10, y = 0, yend = 1, xend = 10), size = 0.3) +
+        annotate("text", x = 10, y = 1.2, label = "Average Collision Rate") +
+        geom_segment(aes(x = 1020, y = predict(mod, data.frame(TIME = 1020)),
+                         yend = 2.2, xend = 1020),
+                     linetype = "dashed") +
+        geom_segment(aes(x = 540, y = predict(mod, data.frame(TIME = 540)),
+                         yend = 2.2, xend = 540),
+                     linetype = "dashed") +
+        geom_segment(aes(x = 4 * 60, y = predict(mod, data.frame(TIME = 4 * 60)),
+                         yend = 2.2, xend = 4 * 60),
+                     linetype = "dashed") +
+        annotate("text", x = 540, y = 2.5, label = "9 am") +
+        annotate("text", x = 1020, y = 2.5, label = "5 pm") +
+        annotate("text", x = 4 * 60, y = 2.5, label = "4 am") +
+        coord_polar() +
+        theme(axis.line.y = element_blank(),
+              panel.grid.major.x = element_line(size = 1),
+              panel.grid.major.y = element_blank(),
+              panel.grid.minor = element_blank(),
+              panel.border = element_blank(),
+              panel.background = element_blank(),
+              axis.text = element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.title.y = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.title.x = element_text(size = 12, vjust = 120, face = "bold"))
+p1
 ```
